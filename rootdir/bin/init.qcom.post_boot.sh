@@ -29,6 +29,15 @@
 
 target=`getprop ro.board.platform`
 
+# WALT is a module on 5.15 and registers its controls below /proc/sys/walt.
+# Select by the live interface so other SM8250 devices retain their donor policy.
+scheduler_sysctl=/proc/sys/kernel
+frequency_governor=schedutil
+if [ -d /proc/sys/walt ]; then
+    scheduler_sysctl=/proc/sys/walt
+    frequency_governor=walt
+fi
+
 
 # Read MemTotal without fixed-width assumptions or spawning cat/grep.
 function read_mem_total() {
@@ -193,12 +202,12 @@ case "$target" in
 	echo 0 > /sys/devices/system/cpu/cpu0/core_ctl/enable
 
 	# Setting b.L scheduler parameters
-	echo 95 95 > /proc/sys/kernel/sched_upmigrate
-	echo 85 85 > /proc/sys/kernel/sched_downmigrate
-	echo 100 > /proc/sys/kernel/sched_group_upmigrate
-	echo 85 > /proc/sys/kernel/sched_group_downmigrate
-	echo 1 > /proc/sys/kernel/sched_walt_rotate_big_tasks
-	echo 400000000 > /proc/sys/kernel/sched_coloc_downmigrate_ns
+	echo 95 95 > ${scheduler_sysctl}/sched_upmigrate
+	echo 85 85 > ${scheduler_sysctl}/sched_downmigrate
+	echo 100 > ${scheduler_sysctl}/sched_group_upmigrate
+	echo 85 > ${scheduler_sysctl}/sched_group_downmigrate
+	echo 1 > ${scheduler_sysctl}/sched_walt_rotate_big_tasks
+	echo 400000000 > ${scheduler_sysctl}/sched_coloc_downmigrate_ns
 
 	# cpuset parameters
         echo 0-2     > /dev/cpuset/background/cpus
@@ -210,41 +219,47 @@ case "$target" in
         echo 0-7     > /dev/cpuset/top-app/cpus
 
 	# Turn off scheduler boost at the end
-	echo 0 > /proc/sys/kernel/sched_boost
+	echo 0 > ${scheduler_sysctl}/sched_boost
 
 	# configure governor settings for silver cluster
-	echo "schedutil" > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
-	echo 0 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/down_rate_limit_us
-	echo 0 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/up_rate_limit_us
+	echo "$frequency_governor" > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor
+	echo 0 > /sys/devices/system/cpu/cpufreq/policy0/${frequency_governor}/down_rate_limit_us
+	echo 0 > /sys/devices/system/cpu/cpufreq/policy0/${frequency_governor}/up_rate_limit_us
         if [ $rev == "2.0" ] || [ $rev == "2.1" ]; then
-		echo 1248000 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/hispeed_freq
+		echo 1248000 > /sys/devices/system/cpu/cpufreq/policy0/${frequency_governor}/hispeed_freq
 	else
-		echo 1228800 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/hispeed_freq
+		echo 1228800 > /sys/devices/system/cpu/cpufreq/policy0/${frequency_governor}/hispeed_freq
 	fi
 	echo 691200 > /sys/devices/system/cpu/cpufreq/policy0/scaling_min_freq
-	echo 1 > /sys/devices/system/cpu/cpufreq/policy0/schedutil/pl
+	echo 1 > /sys/devices/system/cpu/cpufreq/policy0/${frequency_governor}/pl
 
 	# configure input boost settings
-	echo "0:1344000" > /sys/devices/system/cpu/cpu_boost/input_boost_freq
-	echo 120 > /sys/devices/system/cpu/cpu_boost/input_boost_ms
+	if [ "$scheduler_sysctl" = /proc/sys/walt ]; then
+            # Native input boost takes one frequency per CPU, not cpu:freq pairs.
+            echo "1344000 1344000 1344000 1344000 0 0 0 0" > /proc/sys/walt/input_boost/input_boost_freq
+            echo 120 > /proc/sys/walt/input_boost/input_boost_ms
+        else
+            echo "0:1344000" > /sys/devices/system/cpu/cpu_boost/input_boost_freq
+            echo 120 > /sys/devices/system/cpu/cpu_boost/input_boost_ms
+        fi
 
 	# configure governor settings for gold cluster
-	echo "schedutil" > /sys/devices/system/cpu/cpufreq/policy4/scaling_governor
-	echo 0 > /sys/devices/system/cpu/cpufreq/policy4/schedutil/down_rate_limit_us
-	echo 0 > /sys/devices/system/cpu/cpufreq/policy4/schedutil/up_rate_limit_us
-	echo 1574400 > /sys/devices/system/cpu/cpufreq/policy4/schedutil/hispeed_freq
-	echo 1 > /sys/devices/system/cpu/cpufreq/policy4/schedutil/pl
+	echo "$frequency_governor" > /sys/devices/system/cpu/cpufreq/policy4/scaling_governor
+	echo 0 > /sys/devices/system/cpu/cpufreq/policy4/${frequency_governor}/down_rate_limit_us
+	echo 0 > /sys/devices/system/cpu/cpufreq/policy4/${frequency_governor}/up_rate_limit_us
+	echo 1574400 > /sys/devices/system/cpu/cpufreq/policy4/${frequency_governor}/hispeed_freq
+	echo 1 > /sys/devices/system/cpu/cpufreq/policy4/${frequency_governor}/pl
 
 	# configure governor settings for gold+ cluster
-	echo "schedutil" > /sys/devices/system/cpu/cpufreq/policy7/scaling_governor
-	echo 0 > /sys/devices/system/cpu/cpufreq/policy7/schedutil/down_rate_limit_us
-	echo 0 > /sys/devices/system/cpu/cpufreq/policy7/schedutil/up_rate_limit_us
+	echo "$frequency_governor" > /sys/devices/system/cpu/cpufreq/policy7/scaling_governor
+	echo 0 > /sys/devices/system/cpu/cpufreq/policy7/${frequency_governor}/down_rate_limit_us
+	echo 0 > /sys/devices/system/cpu/cpufreq/policy7/${frequency_governor}/up_rate_limit_us
         if [ $rev == "2.0" ] || [ $rev == "2.1" ]; then
-		echo 1632000 > /sys/devices/system/cpu/cpufreq/policy7/schedutil/hispeed_freq
+		echo 1632000 > /sys/devices/system/cpu/cpufreq/policy7/${frequency_governor}/hispeed_freq
 	else
-		echo 1612800 > /sys/devices/system/cpu/cpufreq/policy7/schedutil/hispeed_freq
+		echo 1612800 > /sys/devices/system/cpu/cpufreq/policy7/${frequency_governor}/hispeed_freq
 	fi
-	echo 1 > /sys/devices/system/cpu/cpufreq/policy7/schedutil/pl
+	echo 1 > /sys/devices/system/cpu/cpufreq/policy7/${frequency_governor}/pl
 
 	# Enable bus-dcvs
 	for device in /sys/devices/platform/soc
