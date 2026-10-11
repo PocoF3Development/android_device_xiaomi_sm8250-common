@@ -485,3 +485,6 @@ firmware_directories /vendor/firmware_mnt/image/
 
 # socinfo
 /sys/devices/soc0           serial_number            0000    root    root
+
+# Native UFS BSG query access for the boot-control HAL.
+/dev/bsg/ufs-bsg* 0660 root system
