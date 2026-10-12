@@ -172,7 +172,7 @@ on boot
     setprop vendor.usb.rmnet.inst.name "rmnet"
     setprop vendor.usb.dpl.inst.name "dpl"
     setprop vendor.usb.qdss.inst.name "qdss"
-    setprop vendor.usb.controller a600000.dwc3
+    setprop vendor.usb.controller ${ro.boot.usbcontroller}
 
     chown system system /sys/class/drm/card0-DSI-1/disp_param
     chown system system /proc/tp_selftest
@@ -214,7 +214,7 @@ on charger
     chmod 0771 /mnt/vendor/persist
     mkdir /mnt/vendor/persist/subsys 0770 root system
     start vendor.power_off_alarm
-    setprop sys.usb.controller a600000.dwc3
+    setprop sys.usb.controller ${ro.boot.usbcontroller}
 
 on property:vendor.audio.cit.spkcal.copy=true
     copy /data/vendor/cit/cs35l41_cal.bin /mnt/vendor/persist/audio/cs35l41_cal.bin
